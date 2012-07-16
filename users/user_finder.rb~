@@ -1,0 +1,99 @@
+ # encoding: utf-8 
+
+class FinderCriteria
+  
+  attr_accessor :name, :range, :priority
+  
+  def initialize name, range, border_range, single = false
+    @name, @range = name, range
+    if single
+      @priority = range.to_a.size.to_f / (border_range.max - border_range.min + 1)
+    else
+      @priority = (range.max - range.min).to_f / (border_range.max - border_range.min)
+    end
+  end
+  
+  def suite? person
+    range.include? person.send(name)
+  end
+  
+  def to_s
+    ["name: #{name}", "range: #{range}", "priority: #{priority}"].join ", "
+  end
+  
+end
+
+class PersonFinder
+  
+  attr_accessor :criteria
+  
+  def initialize criterias
+    @criteria = criterias.sort_by{|x, y| y.priority <=> x.priority}
+  end
+
+  def find people
+    people.find_all do |person|
+      criteria.all? {|c| c.suite? person}
+    end
+  end
+  
+  def to_s
+    criteria.join "\n"
+  end
+  
+end
+
+module PersonFields
+  
+  @@fields = [:male, :age, :height, :index, :cash]
+  
+  def initialize attr_hash
+    attr_hash.each {|name, value| instance_variable_set("@#{name}", value)}
+  end
+  
+  def to_s
+    @@fields.map{|f| "#{f}: #{send(f)}"}.join ", "
+  end
+  
+end
+
+class Person
+  
+  include PersonFields
+  
+  @@fields.each {|field| attr_accessor field}
+  
+  
+end
+
+class PersonFactory
+  
+  include PersonFields
+  
+  @@fields.each {|field| attr_accessor "#{field}_min".to_sym, "#{field}_max".to_sym}
+  
+  
+  def random_person
+    random = Random.new
+    attr_hash = {}
+    @@fields.each do |f|
+      attr_hash[f] = random.rand(instance_variable_get("@#{f}_min".to_sym)..instance_variable_get("@#{f}_max".to_sym))
+    end
+    Person.new attr_hash
+  end
+  
+  def random_criteria count_min = 1, count_max = 5
+    criteria = []
+    random = Random.new
+    @@fields.sample(random.rand(count_min..count_max)).each do |f|
+      max = random.rand(instance_variable_get("@#{f}_min".to_sym)..instance_variable_get("@#{f}_max".to_sym))
+      min = random.rand(instance_variable_get("@#{f}_min".to_sym)..max)
+      border_max = instance_variable_get("@#{f}_max".to_sym)
+      border_min = instance_variable_get("@#{f}_min".to_sym)
+      criteria <<  FinderCriteria.new(f, min..max, border_min..border_max, (f == :male ? true: false))
+    end
+    criteria
+  end
+  
+end
+
